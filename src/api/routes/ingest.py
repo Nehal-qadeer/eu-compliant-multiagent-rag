@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
 from src.rag.chunking import IngestionDocument, global_chunker, DocumentChunk
+from src.rag.vector_store import global_vector_store
 from src.core.security import global_key_vault
 from src.core.audit_logger import global_audit_logger
 
@@ -71,7 +72,14 @@ async def ingest_document(payload: IngestRequest):
     has_pii = any(c.has_pii for c in chunks)
     total_pii_entities = sum(len(c.pseudonym_map) for c in chunks)
 
-    # 4. Record Immutable Audit Event (GDPR Art. 25 & EU AI Act Art. 12)
+    # 4. Index Chunks in Tenant-Isolated Vector Store
+    global_vector_store.index_chunks(
+        tenant_id=payload.tenant_id,
+        chunks=chunks,
+        key_id=key_id
+    )
+
+    # 5. Record Immutable Audit Event (GDPR Art. 25 & EU AI Act Art. 12)
     audit_evt = global_audit_logger.log_event(
         event_type="INGESTION_AND_PII_REDACTION",
         tenant_id=payload.tenant_id,

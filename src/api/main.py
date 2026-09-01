@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.config import settings
 from src.api.routes.ingest import router as ingest_router
 from src.api.routes.gdpr import router as gdpr_router
+from src.api.routes.query import router as query_router
 
 app = FastAPI(
     title="Enterprise EU-Compliant Multi-Agent RAG API",
@@ -30,6 +31,7 @@ app.add_middleware(
 # Mount API Routers
 app.include_router(ingest_router)
 app.include_router(gdpr_router)
+app.include_router(query_router)
 
 
 @app.get("/health", tags=["System Health"])
