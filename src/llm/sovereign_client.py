@@ -48,7 +48,9 @@ class SovereignLLMClient:
         """
         if self.provider in ["local_vllm", "ollama", "azure_eu"]:
             try:
-                async with httpx.AsyncClient(timeout=30.0) as client:
+                # Fast connect timeout so offline local development falls back instantly
+                timeout_cfg = httpx.Timeout(connect=0.15, read=10.0, write=5.0, pool=2.0)
+                async with httpx.AsyncClient(timeout=timeout_cfg) as client:
                     payload = {
                         "model": self.model_name,
                         "messages": [
@@ -75,7 +77,7 @@ class SovereignLLMClient:
                             provider=self.provider
                         )
             except Exception:
-                # Fallback to local sovereign generator if endpoint is offline
+                # Instant fallback to local sovereign offline synthesis
                 pass
 
         # Offline Sovereign Generator (Deterministic Grounded Synthesis)
