@@ -19,12 +19,12 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# CORS configuration
+# CORS configuration with strict explicit allow-list
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -41,9 +41,10 @@ async def health_check():
         "status": "healthy",
         "environment": settings.ENVIRONMENT,
         "gdpr_compliance": "ACTIVE",
-        "eu_ai_act_mode": "HIGH_RISK_AUDIT_READY",
+        "eu_ai_act_classification": "MINIMAL_LOW_RISK (Article 50 Transparency Compliant)",
         "gdpr_technical_measures": "ACTIVE (AES-256 Crypto Shredding & Presidio PII Sanitization)",
         "eu_ai_act_transparency": "ACTIVE (Article 50 Disclosures & Article 12 Audit Logging)",
+        "rbac_security": "ENFORCED (API Key Header Validation)",
         "pii_engine": "Microsoft Presidio (with EU SEPA/Tax recognizers)",
         "dense_embeddings": "SentenceTransformers (all-MiniLM-L6-v2 / sovereign fallback)",
         "verification_gate": "Natural Language Inference (NLI / DeBERTa Cross-Encoder)"

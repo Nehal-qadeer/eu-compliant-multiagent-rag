@@ -4,6 +4,7 @@ End-to-End API Integration Tests for Multi-Agent Query Endpoint (/api/v1/query).
 
 import pytest
 from httpx import AsyncClient
+from src.config import settings
 
 
 @pytest.mark.asyncio
@@ -14,6 +15,8 @@ async def test_full_rag_ingest_and_query_flow(async_client: AsyncClient):
     2. Query multi-agent RAG endpoint.
     3. Assert grounded answer, citations, transparency watermark, and audit trail record.
     """
+    headers = {"X-API-Key": settings.API_KEY_EMPLOYEE}
+
     # 1. Ingest
     ingest_payload = {
         "tenant_id": "corp_berlin_01",
@@ -28,7 +31,7 @@ All GPAI models interacting with European citizens must provide machine-readable
         "actor_id": "compliance_lead"
     }
 
-    ingest_res = await async_client.post("/api/v1/ingest", json=ingest_payload)
+    ingest_res = await async_client.post("/api/v1/ingest", json=ingest_payload, headers=headers)
     assert ingest_res.status_code == 201
 
     # 2. Query
@@ -38,7 +41,7 @@ All GPAI models interacting with European citizens must provide machine-readable
         "actor_id": "auditor_elena"
     }
 
-    query_res = await async_client.post("/api/v1/query", json=query_payload)
+    query_res = await async_client.post("/api/v1/query", json=query_payload, headers=headers)
     assert query_res.status_code == 200
     data = query_res.json()
 
@@ -54,16 +57,18 @@ All GPAI models interacting with European citizens must provide machine-readable
 @pytest.mark.asyncio
 async def test_query_insufficient_context_fallback(async_client: AsyncClient):
     """Verifies that queries completely outside of indexed documents trigger safe fallback without hallucination."""
+    headers = {"X-API-Key": settings.API_KEY_EMPLOYEE}
     query_payload = {
         "tenant_id": "corp_berlin_01",
         "query": "What is the secret recipe for volcanic fusion fuel?",
         "actor_id": "curious_user"
     }
 
-    query_res = await async_client.post("/api/v1/query", json=query_payload)
+    query_res = await async_client.post("/api/v1/query", json=query_payload, headers=headers)
     assert query_res.status_code == 200
     data = query_res.json()
 
     assert data["status"] == "INSUFFICIENT_CONTEXT"
     assert "Insufficient context in verified enterprise documents" in data["answer"]
     assert len(data["citations"]) == 0
+

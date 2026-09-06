@@ -14,8 +14,48 @@ logger = logging.getLogger(__name__)
 
 # Try importing Microsoft Presidio
 try:
+    import spacy
     from presidio_analyzer import AnalyzerEngine, PatternRecognizer, Pattern, RecognizerRegistry, RecognizerResult
+    from presidio_analyzer.nlp_engine import NlpEngine, NlpArtifacts
     from presidio_anonymizer import AnonymizerEngine
+
+    class BlankSpacyEngine(NlpEngine):
+        """Zero-download deterministic NLP engine using spaCy's blank tokenizer."""
+        def __init__(self):
+            self.nlp = {"en": spacy.blank("en")}
+
+        def is_loaded(self) -> bool:
+            return True
+
+        def load(self):
+            pass
+
+        def process_text(self, text: str, language: str):
+            doc = self.nlp[language](text)
+            return NlpArtifacts(
+                entities=[],
+                tokens=[t.text for t in doc],
+                tokens_indices=[t.idx for t in doc],
+                lemmas=[t.lemma_ if t.lemma_ else t.text for t in doc],
+                nlp_engine=self,
+                language=language
+            )
+
+        def process_batch(self, texts, language, **kwargs):
+            return [self.process_text(t, language) for t in texts]
+
+        def is_stopword(self, word: str, language: str) -> bool:
+            return False
+
+        def is_punct(self, word: str, language: str) -> bool:
+            return False
+
+        def get_supported_languages(self):
+            return ["en"]
+
+        def get_supported_entities(self):
+            return []
+
     PRESIDIO_AVAILABLE = True
 except ImportError:
     PRESIDIO_AVAILABLE = False
@@ -91,8 +131,8 @@ class PIISanitizer:
 
     def __init__(self, confidence_threshold: float = 0.60):
         self.confidence_threshold = confidence_threshold
-        self.presidio_analyzer: Optional[Any] = None
-        self.presidio_anonymizer: Optional[Any] = None
+        self.presidio_analyzer = None
+        self.presidio_anonymizer = None
         self.engine_name = "built_in_regex"
 
         if PRESIDIO_AVAILABLE:
@@ -102,9 +142,10 @@ class PIISanitizer:
                 logger.warning(f"Failed to initialize Presidio NLP engine: {e}. Using pattern recognizer mode.")
 
     def _init_presidio(self):
-        """Initializes Presidio AnalyzerEngine with custom EU recognizers."""
+        """Initializes Presidio AnalyzerEngine with custom EU recognizers using offline blank engine."""
+        nlp_engine = BlankSpacyEngine()
         registry = RecognizerRegistry()
-        registry.load_predefined_recognizers()
+        registry.load_predefined_recognizers(nlp_engine=nlp_engine)
 
         # 1. Custom IBAN Recognizer for EU SEPA
         iban_pattern = Pattern(
@@ -158,7 +199,7 @@ class PIISanitizer:
         )
         registry.add_recognizer(phone_recognizer)
 
-        self.presidio_analyzer = AnalyzerEngine(registry=registry)
+        self.presidio_analyzer = AnalyzerEngine(registry=registry, nlp_engine=nlp_engine)
         self.presidio_anonymizer = AnonymizerEngine()
         self.engine_name = "microsoft_presidio"
 

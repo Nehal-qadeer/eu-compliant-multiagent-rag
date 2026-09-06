@@ -92,7 +92,10 @@ async def execute_right_to_erasure(
 
 
 @router.get("/keys/{tenant_id}", response_model=List[Dict[str, Any]])
-async def list_tenant_keys(tenant_id: str):
+async def list_tenant_keys(
+    tenant_id: str,
+    current_actor: AuthenticatedActor = Security(require_roles([UserRole.DPO, UserRole.ADMIN, UserRole.AUDITOR]))
+):
     """Lists all cryptographic keys for a given tenant and their active/shredded status."""
     keys = global_key_vault.list_keys_for_tenant(tenant_id)
     return [
@@ -112,7 +115,9 @@ async def list_tenant_keys(tenant_id: str):
 async def get_audit_trail(
     tenant_id: Optional[str] = Query(None, description="Filter by tenant ID"),
     event_type: Optional[str] = Query(None, description="Filter by event type"),
-    limit: int = Query(50, le=200, description="Max number of records")
+    limit: int = Query(50, le=200, description="Max number of records"),
+    current_actor: AuthenticatedActor = Security(require_roles([UserRole.DPO, UserRole.ADMIN, UserRole.AUDITOR]))
 ):
     """Queries the immutable tamper-evident audit ledger for regulatory inspection."""
     return global_audit_logger.query_logs(tenant_id=tenant_id, event_type=event_type, limit=limit)
+

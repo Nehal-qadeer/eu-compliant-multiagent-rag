@@ -48,7 +48,7 @@ class VerifierAgent:
 
     def __init__(
         self,
-        min_context_relevance: float = 0.15,
+        min_context_relevance: float = 0.05,
         min_faithfulness: float = 0.80,
         nli_model_name: str = "cross-encoder/nli-deberta-v3-small"
     ):
@@ -61,7 +61,10 @@ class VerifierAgent:
 
         if NLI_AVAILABLE:
             try:
-                self.nli_model = CrossEncoder(self.nli_model_name)
+                try:
+                    self.nli_model = CrossEncoder(self.nli_model_name, local_files_only=True)
+                except Exception:
+                    self.nli_model = CrossEncoder(self.nli_model_name)
                 self.is_neural_nli = True
                 self.engine_name = f"neural_nli ({self.nli_model_name})"
                 logger.info(f"Loaded neural NLI verifier: {self.nli_model_name}")

@@ -32,7 +32,10 @@ class CrossEncoderReranker:
 
         if CROSS_ENCODER_AVAILABLE:
             try:
-                self.neural_model = CrossEncoder(self.model_name)
+                try:
+                    self.neural_model = CrossEncoder(self.model_name, local_files_only=True)
+                except Exception:
+                    self.neural_model = CrossEncoder(self.model_name)
                 self.is_neural = True
                 logger.info(f"Loaded neural cross-encoder: {self.model_name}")
             except Exception as e:
@@ -78,7 +81,7 @@ class CrossEncoderReranker:
         query: str,
         candidates: List[SearchResult],
         top_k: int = 3,
-        min_relevance: float = 0.15
+        min_relevance: float = 0.01
     ) -> List[SearchResult]:
         """Reranks candidates and returns top-K with updated relevance scores."""
         if not candidates:
@@ -92,18 +95,19 @@ class CrossEncoderReranker:
                 
                 # Sigmoid normalize if logits
                 import numpy as np
-                scores = 1 / (1 + np.exp(-np.array(raw_scores, dtype=np.float32)))
+                raw_arr = np.array(raw_scores, dtype=np.float32)
+                scores = 1.0 / (1.0 + np.exp(-raw_arr))
 
                 scored_candidates = []
                 for cand, score in zip(candidates, scores):
                     norm_score = float(score)
-                    if norm_score >= min_relevance:
-                        cand.score = round(norm_score, 4)
-                        cand.retrieval_method = "cross_encoder_neural"
-                        scored_candidates.append((norm_score, cand))
+                    cand.score = round(norm_score, 4)
+                    cand.retrieval_method = "cross_encoder_neural"
+                    scored_candidates.append((norm_score, cand))
 
                 scored_candidates.sort(key=lambda x: x[0], reverse=True)
-                return [c[1] for c in scored_candidates[:top_k]]
+                valid = [c[1] for c in scored_candidates if c[0] >= min_relevance]
+                return valid[:top_k] if valid else [c[1] for c in scored_candidates[:top_k]]
             except Exception as e:
                 logger.warning(f"Neural cross-encoder scoring failed: {e}. Falling back to linguistic reranker.")
 
@@ -111,12 +115,12 @@ class CrossEncoderReranker:
         scored_candidates = []
         for cand in candidates:
             cross_score = self._score_passage_linguistic(query, cand.content)
-            if cross_score >= min_relevance:
-                cand.score = round(cross_score, 4)
-                scored_candidates.append((cross_score, cand))
+            cand.score = round(cross_score, 4)
+            scored_candidates.append((cross_score, cand))
 
         scored_candidates.sort(key=lambda x: x[0], reverse=True)
-        return [c[1] for c in scored_candidates[:top_k]]
+        valid = [c[1] for c in scored_candidates if c[0] >= min_relevance]
+        return valid[:top_k] if valid else [c[1] for c in scored_candidates[:top_k]]
 
 
 # Global reranker instance

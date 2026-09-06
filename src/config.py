@@ -3,7 +3,7 @@ Enterprise EU-Compliant RAG Configuration Module.
 Provides validated environment settings with strict defaults for GDPR and EU AI Act compliance.
 """
 
-from typing import Literal
+from typing import Literal, List, Optional
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -22,7 +22,27 @@ class Settings(BaseSettings):
     DEBUG: bool = Field(default=False, description="Enable debug mode")
     LOG_LEVEL: str = Field(default="INFO", description="Application log level")
 
-    # Security & Encryption
+    # Security, CORS & Access Control
+    CORS_ORIGINS: List[str] = Field(
+        default=[
+            "http://localhost:3000",
+            "http://localhost:8000",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:8000",
+            "https://nehal-portfolio-one.vercel.app"
+        ],
+        description="Allowed CORS origin domains"
+    )
+    REQUIRE_AUTH: bool = Field(
+        default=True,
+        description="Enforce strict API Key authentication across all /api/v1/* routes"
+    )
+    API_KEY_ADMIN: str = Field(default="admin-root-key-1122", description="Admin role API key")
+    API_KEY_DPO: str = Field(default="dpo-secure-key-9988", description="DPO / Compliance officer API key")
+    API_KEY_EMPLOYEE: str = Field(default="employee-user-key-3344", description="Employee user API key")
+    API_KEY_AUDITOR: str = Field(default="auditor-inspect-key-5566", description="Auditor role API key")
+
+    # Encryption & Key Vault
     MASTER_KEY: str = Field(
         default="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
         description="Master key hex string used for key vault root operations"
@@ -36,22 +56,34 @@ class Settings(BaseSettings):
         description="Path for immutable EU AI Act Art. 12 audit ledger"
     )
 
-    # Sovereign Inference
-    SOVEREIGN_LLM_PROVIDER: Literal["local_vllm", "ollama", "mistral_eu", "azure_eu", "mock"] = Field(
+    # Inference Providers & Sovereignty
+    SOVEREIGN_LLM_PROVIDER: Literal["local_vllm", "ollama", "mistral_eu", "azure_eu", "anthropic_claude", "mock"] = Field(
         default="local_vllm",
-        description="EU Sovereign LLM provider"
+        description="EU Sovereign or configured LLM provider"
     )
     SOVEREIGN_LLM_BASE_URL: str = Field(
         default="http://localhost:8000/v1",
-        description="Base URL for sovereign LLM endpoint"
+        description="Base URL for sovereign OpenAI-compatible endpoint"
+    )
+    OLLAMA_BASE_URL: str = Field(
+        default="http://localhost:11434",
+        description="Base URL for local Ollama instance"
     )
     SOVEREIGN_LLM_MODEL: str = Field(
         default="mistralai/Mistral-7B-Instruct-v0.3",
         description="Model identifier"
     )
+    ANTHROPIC_API_KEY: Optional[str] = Field(
+        default=None,
+        description="Optional Anthropic API Key (Note: Cloud API, sets is_sovereign=False)"
+    )
+    ANTHROPIC_MODEL: str = Field(
+        default="claude-3-5-sonnet-20241022",
+        description="Anthropic Claude model identifier"
+    )
     SOVEREIGN_EMBEDDING_MODEL: str = Field(
-        default="BAAI/bge-m3",
-        description="Embedding model identifier"
+        default="sentence-transformers/all-MiniLM-L6-v2",
+        description="Dense embedding model identifier"
     )
 
     # Vector Storage
@@ -79,3 +111,4 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+

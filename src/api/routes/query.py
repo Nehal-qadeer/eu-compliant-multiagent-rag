@@ -4,10 +4,11 @@ Receives user natural language queries, coordinates multi-agent workflow, and re
 """
 
 from typing import Optional
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Security, status
 from pydantic import BaseModel, Field
 
 from src.agents.supervisor import MultiAgentSupervisor, MultiAgentRAGResult, global_multiagent_supervisor
+from src.api.auth import require_roles, UserRole, AuthenticatedActor
 
 router = APIRouter(prefix="/api/v1/query", tags=["Multi-Agent RAG Query"])
 
@@ -21,7 +22,10 @@ class QueryRequest(BaseModel):
 
 
 @router.post("", response_model=MultiAgentRAGResult, status_code=status.HTTP_200_OK)
-async def query_multi_agent_rag(payload: QueryRequest):
+async def query_multi_agent_rag(
+    payload: QueryRequest,
+    current_actor: AuthenticatedActor = Security(require_roles([UserRole.ADMIN, UserRole.EMPLOYEE, UserRole.DPO, UserRole.AUDITOR]))
+):
     """
     Executes the enterprise multi-agent RAG pipeline:
     1. Query sanitization (PII & injection filtering)

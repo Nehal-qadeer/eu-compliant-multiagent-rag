@@ -37,8 +37,11 @@ class EmbeddingModel:
 
         if SENTENCE_TRANSFORMERS_AVAILABLE:
             try:
-                # Initialize neural embedding model
-                self.neural_model = SentenceTransformer(self.model_name)
+                # Initialize neural embedding model (attempt local cache first)
+                try:
+                    self.neural_model = SentenceTransformer(self.model_name, local_files_only=True)
+                except Exception:
+                    self.neural_model = SentenceTransformer(self.model_name)
                 self.dimension = self.neural_model.get_sentence_embedding_dimension()
                 self.is_neural = True
                 logger.info(f"Loaded neural embedding model: {self.model_name} (dim: {self.dimension})")

@@ -4,13 +4,14 @@ Handles multi-format document ingestion, automated PII sanitization, and cryptog
 """
 
 from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Security, status
 from pydantic import BaseModel, Field
 
 from src.rag.chunking import IngestionDocument, global_chunker, DocumentChunk
 from src.rag.vector_store import global_vector_store
 from src.core.security import global_key_vault
 from src.core.audit_logger import global_audit_logger
+from src.api.auth import require_roles, UserRole, AuthenticatedActor
 
 router = APIRouter(prefix="/api/v1/ingest", tags=["Ingestion & Privacy"])
 
@@ -43,7 +44,10 @@ ingested_documents_store: Dict[str, Dict[str, Any]] = {}
 
 
 @router.post("", response_model=IngestResponse, status_code=status.HTTP_201_CREATED)
-async def ingest_document(payload: IngestRequest):
+async def ingest_document(
+    payload: IngestRequest,
+    current_actor: AuthenticatedActor = Security(require_roles([UserRole.ADMIN, UserRole.EMPLOYEE, UserRole.DPO]))
+):
     """
     Ingests an enterprise document, generates a dedicated cryptographic key for GDPR compliance,
     sanitizes PII via Presidio/NER, produces context-aware chunks, and records an immutable audit log.
