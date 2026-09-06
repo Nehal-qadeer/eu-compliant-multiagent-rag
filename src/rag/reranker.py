@@ -1,25 +1,51 @@
 """
 Contextual Cross-Encoder Reranker.
-Re-evaluates and scores candidate chunks using query-context token interactions.
+Re-evaluates and scores candidate chunks using true Transformer Cross-Encoder attention
+(e.g. cross-encoder/ms-marco-MiniLM-L-6-v2) or transparent linguistic fallback.
 """
 
-from typing import List
+import logging
+from typing import List, Optional, Any
 from src.rag.vector_store import SearchResult
+
+logger = logging.getLogger(__name__)
+
+# Try importing CrossEncoder
+try:
+    from sentence_transformers import CrossEncoder
+    CROSS_ENCODER_AVAILABLE = True
+except ImportError:
+    CROSS_ENCODER_AVAILABLE = False
+    logger.info("sentence-transformers CrossEncoder not available. Using linguistic alignment reranker.")
 
 
 class CrossEncoderReranker:
     """
-    Reranks candidate chunks by measuring deep query-passage semantic alignment.
+    Reranks candidate chunks by measuring deep query-passage cross-attention semantic alignment.
     Eliminates false positives from dense/sparse retrieval stages.
     """
 
     def __init__(self, model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"):
         self.model_name = model_name
+        self.neural_model: Optional[Any] = None
+        self.is_neural: bool = False
 
-    def _score_passage(self, query: str, passage: str) -> float:
+        if CROSS_ENCODER_AVAILABLE:
+            try:
+                self.neural_model = CrossEncoder(self.model_name)
+                self.is_neural = True
+                logger.info(f"Loaded neural cross-encoder: {self.model_name}")
+            except Exception as e:
+                logger.warning(
+                    f"Could not load neural cross-encoder '{self.model_name}': {e}. "
+                    "Engaging sovereign linguistic reranking engine."
+                )
+                self.is_neural = False
+
+    def _score_passage_linguistic(self, query: str, passage: str) -> float:
         """
-        Calculates cross-attention semantic alignment score between query and passage.
-        Evaluates exact token coverage, phrase matching, and structural relevance.
+        Calculates cross-token linguistic alignment score between query and passage.
+        Evaluates exact token coverage, phrase matching, and structural density.
         """
         q_tokens = set(query.lower().split())
         if not q_tokens:
@@ -58,14 +84,37 @@ class CrossEncoderReranker:
         if not candidates:
             return []
 
+        # 1. Neural Cross-Encoder Prediction
+        if self.is_neural and self.neural_model is not None:
+            try:
+                pairs = [[query, c.content] for c in candidates]
+                raw_scores = self.neural_model.predict(pairs)
+                
+                # Sigmoid normalize if logits
+                import numpy as np
+                scores = 1 / (1 + np.exp(-np.array(raw_scores, dtype=np.float32)))
+
+                scored_candidates = []
+                for cand, score in zip(candidates, scores):
+                    norm_score = float(score)
+                    if norm_score >= min_relevance:
+                        cand.score = round(norm_score, 4)
+                        cand.retrieval_method = "cross_encoder_neural"
+                        scored_candidates.append((norm_score, cand))
+
+                scored_candidates.sort(key=lambda x: x[0], reverse=True)
+                return [c[1] for c in scored_candidates[:top_k]]
+            except Exception as e:
+                logger.warning(f"Neural cross-encoder scoring failed: {e}. Falling back to linguistic reranker.")
+
+        # 2. Linguistic Cross-Attention Fallback
         scored_candidates = []
         for cand in candidates:
-            cross_score = self._score_passage(query, cand.content)
+            cross_score = self._score_passage_linguistic(query, cand.content)
             if cross_score >= min_relevance:
                 cand.score = round(cross_score, 4)
                 scored_candidates.append((cross_score, cand))
 
-        # Sort descending by cross-encoder score
         scored_candidates.sort(key=lambda x: x[0], reverse=True)
         return [c[1] for c in scored_candidates[:top_k]]
 

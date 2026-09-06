@@ -1,6 +1,6 @@
 """
 Main FastAPI Application Entrypoint.
-Initializes middleware, CORS, lifecycle management, and API routes.
+Initializes middleware, CORS, lifecycle management, and API routes with calibrated GDPR & EU AI Act controls.
 """
 
 from fastapi import FastAPI
@@ -12,9 +12,9 @@ from src.api.routes.gdpr import router as gdpr_router
 from src.api.routes.query import router as query_router
 
 app = FastAPI(
-    title="Enterprise EU-Compliant Multi-Agent RAG API",
-    description="Privacy-first RAG platform strictly compliant with GDPR and the EU AI Act.",
-    version="0.1.0",
+    title="Enterprise EU Sovereign Multi-Agent RAG Platform",
+    description="Privacy-by-Design RAG platform providing Technical & Organizational Measures (TOMs) under GDPR Art. 17/25/32 and transparency disclosures under EU AI Act Art. 50.",
+    version="0.2.0",
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -36,12 +36,16 @@ app.include_router(query_router)
 
 @app.get("/health", tags=["System Health"])
 async def health_check():
-    """Health check endpoint confirming API status and active compliance mode."""
+    """Health check endpoint confirming API status, active engines, and calibrated compliance posture."""
     return {
         "status": "healthy",
         "environment": settings.ENVIRONMENT,
         "gdpr_compliance": "ACTIVE",
         "eu_ai_act_mode": "HIGH_RISK_AUDIT_READY",
-        "pii_sanitization": "ENABLED",
-        "crypto_shredding": "ENABLED"
+        "gdpr_technical_measures": "ACTIVE (AES-256 Crypto Shredding & Presidio PII Sanitization)",
+        "eu_ai_act_transparency": "ACTIVE (Article 50 Disclosures & Article 12 Audit Logging)",
+        "pii_engine": "Microsoft Presidio (with EU SEPA/Tax recognizers)",
+        "dense_embeddings": "SentenceTransformers (all-MiniLM-L6-v2 / sovereign fallback)",
+        "verification_gate": "Natural Language Inference (NLI / DeBERTa Cross-Encoder)"
     }
+

@@ -4,12 +4,13 @@ Provides cryptographic shredding operations and audit trail verification endpoin
 """
 
 from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Security, status
 from pydantic import BaseModel, Field
 
 from src.core.security import global_key_vault, KeyMetadata, KeyRevokedError
 from src.core.audit_logger import global_audit_logger, AuditEvent
 from src.api.routes.ingest import ingested_documents_store
+from src.api.auth import require_roles, UserRole, AuthenticatedActor
 
 router = APIRouter(prefix="/api/v1/gdpr", tags=["GDPR & AI Act Compliance"])
 
@@ -36,7 +37,10 @@ class ErasureResponse(BaseModel):
 
 
 @router.post("/erasure", response_model=ErasureResponse, status_code=status.HTTP_200_OK)
-async def execute_right_to_erasure(payload: ErasureRequest):
+async def execute_right_to_erasure(
+    payload: ErasureRequest,
+    current_actor: AuthenticatedActor = Security(require_roles([UserRole.DPO, UserRole.ADMIN]))
+):
     """
     Executes GDPR Article 17 Cryptographic Shredding.
     Permanently destroys the AES-256 encryption key associated with the subject/document,
